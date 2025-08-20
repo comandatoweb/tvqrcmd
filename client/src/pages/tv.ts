@@ -8,12 +8,15 @@ import { getDeviceId } from '../lib/device';
 export async function initTvPage(root: HTMLElement, roomId: string): Promise<void> {
   root.innerHTML = `
     <div class="flex flex-col items-center justify-center h-full">
-      <video id="video" class="w-full max-h-full bg-black" muted autoplay playsinline></video>
+      <video id="video" class="w-full max-h-full bg-black" muted autoplay loop playsinline></video>
       <canvas id="qr" class="mt-4"></canvas>
     </div>
   `;
   const video = document.getElementById('video') as HTMLVideoElement;
   const qrCanvas = document.getElementById('qr') as HTMLCanvasElement;
+  // Asegurar reproducción sin audio y en bucle
+  video.muted = true;
+  video.loop = true;
 
   let roomInfo: { src: string; type: 'mp4' | 'hls'; token: string };
   try {
@@ -63,13 +66,15 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
       video.src = src;
       video.load();
     }
+    // Mantener siempre sin audio y en bucle tras cambiar la fuente
+    video.muted = true;
+    video.loop = true;
     // Log when metadata and data are loaded
     video.addEventListener('loadedmetadata', () => console.log('[TV] loadedmetadata, duration=', video.duration));
     video.addEventListener('loadeddata', () => console.log('[TV] loadeddata'));
     video.addEventListener('canplay', () => console.log('[TV] canplay'));
   });
   socket.on('srv_cmd_rate', ({ rate }) => (video.playbackRate = rate));
-  socket.on('srv_cmd_mute', ({ muted }) => (video.muted = muted));
 
   // Drift correction loop every 2s
   // Clear any existing interval to prevent duplicates

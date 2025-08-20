@@ -1,5 +1,4 @@
-import { connectSocket, joinRoom, onRoomState, sendPlayAt, sendPause, sendSeek, sendChangeSrc, sendRate, sendMute } from '../lib/socket';
-import { generateQr } from '../lib/qr';
+import { connectSocket, joinRoom, onRoomState, sendPlayAt, sendPause, sendSeek, sendChangeSrc, sendRate } from '../lib/socket';
 import { getDeviceId } from '../lib/device';
 
 export function initControllerPage(root: HTMLElement, roomId: string, token?: string): void {
@@ -14,22 +13,19 @@ export function initControllerPage(root: HTMLElement, roomId: string, token?: st
         <button id="load" class="bg-green-500 text-white px-2 py-1 rounded">Cargar</button>
       </div>
       <div class="space-x-2">
-        <button id="playAt" class="bg-blue-500 text-white px-2 py-1 rounded">Programar inicio</button>
+        <button id="playAt" class="bg-blue-500 text-white px-2 py-1 rounded">Sincronizar</button>
         <button id="pause" class="bg-red-500 text-white px-2 py-1 rounded">Pausar</button>
         <button id="resume" class="bg-blue-700 text-white px-2 py-1 rounded">Reanudar</button>
         <button id="forceStart" class="bg-yellow-500 text-black px-2 py-1 rounded">Forzar inicio</button>
       </div>
-      <div class="flex items-center space-x-4">
-        <label class="flex items-center">Seek:
-          <input id="seek" type="range" min="0" max="0" step="0.1" class="w-64 mx-2" />
-        </label>
-        <label class="flex items-center">Rate:
-          <input id="rate" type="range" min="0.5" max="2" step="0.1" value="1" class="mx-2" />
-        </label>
-        <label class="flex items-center">Mute:
-          <input id="mute" type="checkbox" class="mx-2" />
-        </label>
-      </div>
+        <div class="flex items-center space-x-4">
+          <label class="flex items-center">Seek:
+            <input id="seek" type="range" min="0" max="0" step="0.1" class="w-64 mx-2" />
+          </label>
+          <label class="flex items-center">Rate:
+            <input id="rate" type="range" min="0.5" max="2" step="0.1" value="1" class="mx-2" />
+          </label>
+        </div>
       <table class="min-w-full bg-white">
         <thead>
           <tr class="bg-gray-200">
@@ -56,7 +52,6 @@ export function initControllerPage(root: HTMLElement, roomId: string, token?: st
   const typeSelect = document.getElementById('type') as HTMLSelectElement;
   const seekInput = document.getElementById('seek') as HTMLInputElement;
   const rateInput = document.getElementById('rate') as HTMLInputElement;
-  const muteInput = document.getElementById('mute') as HTMLInputElement;
 
   document.getElementById('load')!.onclick = () => {
     console.log('[Controller] sendChangeSrc →', srcInput.value, typeSelect.value);
@@ -71,7 +66,6 @@ export function initControllerPage(root: HTMLElement, roomId: string, token?: st
   document.getElementById('forceStart')!.onclick = () => sendPlayAt({ epochMs: Date.now() + 100 });
   seekInput.onchange = () => sendSeek({ time: parseFloat(seekInput.value) });
   rateInput.onchange = () => sendRate({ rate: parseFloat(rateInput.value) });
-  muteInput.onchange = () => sendMute({ muted: muteInput.checked });
 
   onRoomState((state) => updateState(state, srcInput, typeSelect, seekInput));
 }
