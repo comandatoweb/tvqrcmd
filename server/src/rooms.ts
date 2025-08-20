@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from 'uuid';
-import { TvStatePayload } from './types';
 
 export type StreamType = 'mp4' | 'hls';
 

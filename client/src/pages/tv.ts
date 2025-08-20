@@ -5,24 +5,34 @@ import { generateQr } from '../lib/qr';
 import { controlDrift } from '../lib/drift';
 import { getDeviceId } from '../lib/device';
 
+declare global {
+  interface Window {
+    tvSyncInterval?: number;
+  }
+}
+
 export async function initTvPage(root: HTMLElement, roomId: string): Promise<void> {
   root.innerHTML = `
     <div class="flex flex-col items-center justify-center h-full">
-      <video id="video" class="w-full max-h-full bg-black" muted autoplay playsinline></video>
+      <video id="video" class="w-full max-h-full bg-black" muted autoplay loop playsinline></video>
       <canvas id="qr" class="mt-4"></canvas>
     </div>
   `;
   const video = document.getElementById('video') as HTMLVideoElement;
   const qrCanvas = document.getElementById('qr') as HTMLCanvasElement;
+  // Asegurar reproducción sin audio y en bucle
+  video.muted = true;
+  video.loop = true;
 
-  let roomInfo: { src: string; type: 'mp4' | 'hls'; token: string };
+  let roomInfo: { src: string; type: 'mp4' | 'hls'; token: string; epochScheduled?: number };
   try {
     const res = await fetch(`/rooms/${roomId}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     roomInfo = await res.json();
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error('[TV] fetch room info error:', err);
-    root.innerHTML = `<div class="p-4 text-red-500">Error fetching room info: ${err.message || err}</div>`;
+    root.innerHTML = `<div class="p-4 text-red-500">Error fetching room info: ${message}</div>`;
     return;
   }
   generateQr(qrCanvas, `${window.location.origin}/controller?room=${roomId}&token=${roomInfo.token}`);
@@ -52,8 +62,10 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
     video.play();
   });
   socket.on('srv_cmd_pause', () => video.pause());
-  socket.on('srv_cmd_seek', ({ time }) => (video.currentTime = time));
-  socket.on('srv_cmd_changeSrc', ({ src, type }) => {
+  socket.on('srv_cmd_seek', ({ time }: { time: number }) => {
+    video.currentTime = time;
+  });
+  socket.on('srv_cmd_changeSrc', ({ src, type }: { src: string; type: 'mp4' | 'hls' }) => {
     console.log('[TV] srv_cmd_changeSrc → src=', src, ' type=', type);
     startEpoch = Date.now() + offset;
     video.pause();
@@ -63,18 +75,24 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
       video.src = src;
       video.load();
     }
+    // Mantener siempre sin audio y en bucle tras cambiar la fuente
+    video.muted = true;
+    video.loop = true;
     // Log when metadata and data are loaded
-    video.addEventListener('loadedmetadata', () => console.log('[TV] loadedmetadata, duration=', video.duration));
+    video.addEventListener('loadedmetadata', () =>
+      console.log('[TV] loadedmetadata, duration=', video.duration),
+    );
     video.addEventListener('loadeddata', () => console.log('[TV] loadeddata'));
     video.addEventListener('canplay', () => console.log('[TV] canplay'));
   });
-  socket.on('srv_cmd_rate', ({ rate }) => (video.playbackRate = rate));
-  socket.on('srv_cmd_mute', ({ muted }) => (video.muted = muted));
+  socket.on('srv_cmd_rate', ({ rate }: { rate: number }) => {
+    video.playbackRate = rate;
+  });
 
   // Drift correction loop every 2s
   // Clear any existing interval to prevent duplicates
-  if ((window as any).tvSyncInterval) clearInterval((window as any).tvSyncInterval);
-  (window as any).tvSyncInterval = setInterval(() => {
+  if (window.tvSyncInterval) clearInterval(window.tvSyncInterval);
+  window.tvSyncInterval = window.setInterval(() => {
     const now = Date.now() + offset;
     const expectedTime = startEpoch ? (now - startEpoch) / 1000 : 0;
     const drift = expectedTime - video.currentTime;

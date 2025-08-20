@@ -22,19 +22,21 @@ function initHome(root: HTMLElement): void {
     <button id="create" class="bg-blue-500 text-white px-4 py-2 rounded">Create Room</button>
   </div>
   `;
-  document.getElementById('create')!.addEventListener('click', async () => {
-    const btn = document.getElementById('create') as HTMLButtonElement;
-    btn.disabled = true;
+  const createBtn = document.getElementById('create') as HTMLButtonElement | null;
+  if (!createBtn) return;
+  createBtn.addEventListener('click', async () => {
+    createBtn.disabled = true;
     try {
       const res = await fetch('/rooms', { method: 'POST' });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       const { roomId, token } = await res.json();
       window.location.href = `/controller?room=${roomId}&token=${token}`;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error('[Home] create room error:', err);
-      alert('Error creating room: ' + (err.message || err));
+      alert('Error creating room: ' + message);
     } finally {
-      btn.disabled = false;
+      createBtn.disabled = false;
     }
   });
 }

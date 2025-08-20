@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
+const SERVER_URL = process.env.SERVER_URL || '';
 
 export default defineConfig({
   base: PUBLIC_URL,
@@ -15,9 +16,9 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
-      '/rooms':  { target: process.env.SERVER_URL!, changeOrigin: true },
-      '/health': { target: process.env.SERVER_URL!, changeOrigin: true },
-      '/sync':   { target: process.env.SERVER_URL!, ws: true, changeOrigin: true },
+      '/rooms':  { target: SERVER_URL, changeOrigin: true },
+      '/health': { target: SERVER_URL, changeOrigin: true },
+      '/sync':   { target: SERVER_URL, ws: true, changeOrigin: true },
     },
   },
   resolve: {

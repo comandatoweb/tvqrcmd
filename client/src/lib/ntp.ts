@@ -19,7 +19,7 @@ export async function measureNtpOffset(socket: Socket): Promise<{ offset: number
     const t0 = Date.now();
     const clientSend = t0;
     await new Promise<void>((resolve) => {
-      socket.once('ntp_pong', ({ clientSend: cs, serverSend }: { clientSend: number; serverSend: number }) => {
+      socket.once('ntp_pong', ({ serverSend }: { clientSend: number; serverSend: number }) => {
         const t1 = Date.now();
         const rtt = t1 - t0;
         const offset = serverSend - (t0 + rtt / 2);
