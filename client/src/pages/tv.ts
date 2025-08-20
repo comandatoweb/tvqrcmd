@@ -12,18 +12,6 @@ declare global {
 }
 
 export async function initTvPage(root: HTMLElement, roomId: string): Promise<void> {
-  root.innerHTML = `
-    <div class="flex flex-col items-center justify-center h-full">
-      <video id="video" class="w-full max-h-full bg-black" muted autoplay loop playsinline></video>
-      <canvas id="qr" class="mt-4"></canvas>
-    </div>
-  `;
-  const video = document.getElementById('video') as HTMLVideoElement;
-  const qrCanvas = document.getElementById('qr') as HTMLCanvasElement;
-  // Asegurar reproducción sin audio y en bucle
-  video.muted = true;
-  video.loop = true;
-
   let roomInfo: { src: string; type: 'mp4' | 'hls'; token: string; epochScheduled?: number };
   try {
     const res = await fetch(`/rooms/${roomId}`);
@@ -35,14 +23,18 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
     root.innerHTML = `<div class="p-4 text-red-500">Error fetching room info: ${message}</div>`;
     return;
   }
-  generateQr(qrCanvas, `${window.location.origin}/controller?room=${roomId}&token=${roomInfo.token}`);
+  const controllerUrl = `${window.location.origin}/controller?room=${roomId}&token=${roomInfo.token}`;
+  showQrOnly(root, controllerUrl);
+  let video: HTMLVideoElement | undefined;
   console.log('[TV] initial source:', roomInfo.src, 'type:', roomInfo.type);
-  // Carga inicial de la fuente antes de recibir comandos
-  if (roomInfo.type === 'hls') {
-    setupHls(video, roomInfo.src);
-  } else {
-    video.src = roomInfo.src;
-    video.load();
+  if (roomInfo.src) {
+    video = ensureVideo(root, controllerUrl);
+    if (roomInfo.type === 'hls') {
+      setupHls(video, roomInfo.src);
+    } else {
+      video.src = roomInfo.src;
+      video.load();
+    }
   }
 
   const socket = connectSocket();
@@ -59,15 +51,16 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
 
   socket.on('srv_cmd_playAt', ({ epochMs }) => {
     startEpoch = epochMs;
-    video.play();
+    video?.play();
   });
-  socket.on('srv_cmd_pause', () => video.pause());
+  socket.on('srv_cmd_pause', () => video?.pause());
   socket.on('srv_cmd_seek', ({ time }: { time: number }) => {
-    video.currentTime = time;
+    if (video) video.currentTime = time;
   });
   socket.on('srv_cmd_changeSrc', ({ src, type }: { src: string; type: 'mp4' | 'hls' }) => {
     console.log('[TV] srv_cmd_changeSrc → src=', src, ' type=', type);
     startEpoch = Date.now() + offset;
+    video = ensureVideo(root, controllerUrl);
     video.pause();
     if (type === 'hls') {
       setupHls(video, src);
@@ -79,14 +72,15 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
     video.muted = true;
     video.loop = true;
     // Log when metadata and data are loaded
-    video.addEventListener('loadedmetadata', () =>
-      console.log('[TV] loadedmetadata, duration=', video.duration),
+    const v = video;
+    v.addEventListener('loadedmetadata', () =>
+      console.log('[TV] loadedmetadata, duration=', v.duration),
     );
-    video.addEventListener('loadeddata', () => console.log('[TV] loadeddata'));
-    video.addEventListener('canplay', () => console.log('[TV] canplay'));
+    v.addEventListener('loadeddata', () => console.log('[TV] loadeddata'));
+    v.addEventListener('canplay', () => console.log('[TV] canplay'));
   });
   socket.on('srv_cmd_rate', ({ rate }: { rate: number }) => {
-    video.playbackRate = rate;
+    if (video) video.playbackRate = rate;
   });
 
   // Drift correction loop every 2s
@@ -95,12 +89,43 @@ export async function initTvPage(root: HTMLElement, roomId: string): Promise<voi
   window.tvSyncInterval = window.setInterval(() => {
     const now = Date.now() + offset;
     const expectedTime = startEpoch ? (now - startEpoch) / 1000 : 0;
-    const drift = expectedTime - video.currentTime;
-    controlDrift(video, drift);
-    const buffered = video.buffered.length > 0 ? video.buffered.end(0) - video.currentTime : 0;
-    const ready = buffered >= 4;
-    sendTvState({ rtt, offset, ready, drift });
+    if (video) {
+      const drift = expectedTime - video.currentTime;
+      controlDrift(video, drift);
+      const buffered =
+        video.buffered.length > 0 ? video.buffered.end(0) - video.currentTime : 0;
+      const ready = buffered >= 4;
+      sendTvState({ rtt, offset, ready, drift });
+    } else {
+      sendTvState({ rtt, offset, ready: false, drift: 0 });
+    }
   }, 2000);
 }
 
-// Device ID helper moved to lib/device.ts
+function showQrOnly(root: HTMLElement, url: string): void {
+  root.innerHTML = `
+    <div class="flex items-center justify-center h-full">
+      <canvas id="qr"></canvas>
+    </div>
+  `;
+  const qrCanvas = document.getElementById('qr') as HTMLCanvasElement;
+  generateQr(qrCanvas, url);
+}
+
+function ensureVideo(root: HTMLElement, url: string): HTMLVideoElement {
+  let video = document.getElementById('video') as HTMLVideoElement | null;
+  if (video) return video;
+  root.innerHTML = `
+    <div class="flex flex-col items-center justify-center h-full">
+      <video id="video" class="w-full max-h-full bg-black" muted autoplay loop playsinline></video>
+      <canvas id="qr" class="mt-4"></canvas>
+    </div>
+  `;
+  video = document.getElementById('video') as HTMLVideoElement;
+  const qrCanvas = document.getElementById('qr') as HTMLCanvasElement;
+  generateQr(qrCanvas, url);
+  // Ensure muted loop
+  video.muted = true;
+  video.loop = true;
+  return video;
+}
