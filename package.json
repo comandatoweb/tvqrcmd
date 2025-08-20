@@ -2,7 +2,10 @@
   "name": "qr-tv-sync",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["server", "client"],
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
     "dev:server": "cd server && mkdir -p ./.tmp && TS_NODE_DEV_TMPDIR=./.tmp ts-node-dev --cache-directory=./.tmp --respawn --transpile-only src/index.ts",
     "dev:client": "npm --workspace client run dev",
@@ -18,6 +21,7 @@
     "@typescript-eslint/parser": "^5.44.0",
     "@typescript-eslint/eslint-plugin": "^5.44.0",
     "prettier": "^2.8.1",
-    "eslint-config-prettier": "^8.8.0"
+    "eslint-config-prettier": "^8.8.0",
+    "typescript": "~5.1.6"
   }
 }
